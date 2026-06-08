@@ -4,13 +4,13 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 import tailwindcss from "@tailwindcss/vite";
 
-export default defineConfig(({ mode }) => ({
+export default defineConfig(() => ({
   plugins: [
     tanstackStart({
       server: {
         entry: "src/server.ts",
-        // Usa el preset de Vercel en producción; en desarrollo Node estándar
-        preset: mode === "production" ? "vercel" : "node",
+        // Detecta explícitamente si se está desplegando en Vercel
+        preset: process.env.VERCEL ? "vercel" : "node",
       },
     }),
     react(),
