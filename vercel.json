@@ -1,21 +1,12 @@
 {
   "version": 2,
   "buildCommand": "npm run build",
-  "outputDirectory": "dist",
   "functions": {
     "api/index.js": {
-      "includeFiles": "dist/server/**"
+      "includeFiles": "dist/**"
     }
   },
   "routes": [
-    {
-      "src": "/assets/(.*)",
-      "dest": "/dist/client/assets/$1"
-    },
-    {
-      "src": "/(favicon\\.svg|og-image\\.png)(.*)",
-      "dest": "/dist/client/$1$2"
-    },
     {
       "src": "/(.*)",
       "dest": "/api/index.js"
