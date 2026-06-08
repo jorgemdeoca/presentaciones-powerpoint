@@ -20,28 +20,30 @@ function requireGeminiKey() {
 
 const DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions";
 
-function getDeepSeekKey(): string | undefined {
-  return process.env.DEEPSEEK_API_KEY?.trim() || undefined;
+function getGroqKey(): string | undefined {
+  return process.env.GROQ_API_KEY?.trim() || undefined;
 }
 
 /**
- * Llama a DeepSeek (API compatible con OpenAI) para generar JSON estructurado.
- * DeepSeek se especializa en análisis de documentos, extracción de datos
- * y estructuración de contenido para las diapositivas.
+ * Llama a APIs compatibles con OpenAI (DeepSeek, Groq) para generar JSON estructurado.
  */
-async function chatJSONViaDeepSeek<T>(opts: {
+async function chatJSONViaOpenAICompatible<T>(opts: {
   system: string;
   user: string;
   tool?: { name: string; description: string; parameters: Record<string, unknown> };
   apiKey: string;
+  apiUrl: string;
+  model: string;
+  provider: "deepseek" | "groq";
 }): Promise<T> {
-  if (!breakers.deepseek.canRequest()) {
-    logAi({ endpoint: "deepseek", status: "breaker-open" });
-    throw new Error("DeepSeek en cooldown (circuit breaker abierto)");
+  const breaker = breakers[opts.provider];
+  if (!breaker.canRequest()) {
+    logAi({ endpoint: opts.provider, status: "breaker-open" });
+    throw new Error(`${opts.provider} en cooldown (circuit breaker abierto)`);
   }
 
   const body: Record<string, unknown> = {
-    model: "deepseek-chat",
+    model: opts.model,
     messages: [
       { role: "system", content: opts.system },
       { role: "user", content: opts.user },
@@ -63,18 +65,19 @@ async function chatJSONViaDeepSeek<T>(opts: {
     ];
     body.tool_choice = { type: "function", function: { name: opts.tool.name } };
   } else {
+    // Groq requiere response_format
     body.response_format = { type: "json_object" };
   }
 
   try {
     const result = await withBackoff<T>(
       async (attempt) => {
-        await buckets.deepseek.take(1);
+        await buckets[opts.provider].take(1);
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 90_000);
         const t0 = Date.now();
         try {
-          const res = await fetch(DEEPSEEK_API_URL, {
+          const res = await fetch(opts.apiUrl, {
             method: "POST",
             headers: {
               Authorization: `Bearer ${opts.apiKey}`,
@@ -86,7 +89,7 @@ async function chatJSONViaDeepSeek<T>(opts: {
 
           if (!res.ok) {
             const txt = await res.text().catch(() => "");
-            const err = new Error(`DeepSeek ${res.status}: ${txt.slice(0, 200)}`);
+            const err = new Error(`${opts.provider} ${res.status}: ${txt.slice(0, 200)}`);
             (err as Error & { httpStatus?: number }).httpStatus = res.status;
             throw err;
           }
@@ -99,7 +102,7 @@ async function chatJSONViaDeepSeek<T>(opts: {
           if (toolCall?.function?.arguments) {
             const parsed = JSON.parse(toolCall.function.arguments) as T;
             logAi({
-              endpoint: "deepseek",
+              endpoint: opts.provider,
               status: "ok",
               latencyMs: Date.now() - t0,
               meta: { attempt, tokens: json?.usage?.total_tokens },
@@ -112,7 +115,7 @@ async function chatJSONViaDeepSeek<T>(opts: {
           if (typeof content === "string" && content.trim()) {
             const parsed = JSON.parse(cleanJsonString(content)) as T;
             logAi({
-              endpoint: "deepseek",
+              endpoint: opts.provider,
               status: "ok",
               latencyMs: Date.now() - t0,
               meta: { attempt, tokens: json?.usage?.total_tokens },
@@ -120,7 +123,7 @@ async function chatJSONViaDeepSeek<T>(opts: {
             return parsed;
           }
 
-          throw new Error("Respuesta de DeepSeek vacía");
+          throw new Error(`Respuesta de ${opts.provider} vacía`);
         } finally {
           clearTimeout(timeout);
         }
@@ -137,7 +140,7 @@ async function chatJSONViaDeepSeek<T>(opts: {
         onRetry: (attempt, delayMs, err) => {
           const e = err as { httpStatus?: number; message?: string };
           logAi({
-            endpoint: "deepseek",
+            endpoint: opts.provider,
             status: "retry",
             httpStatus: e?.httpStatus,
             error: e?.message?.slice(0, 160),
@@ -146,10 +149,10 @@ async function chatJSONViaDeepSeek<T>(opts: {
         },
       },
     );
-    breakers.deepseek.recordSuccess();
+    breaker.recordSuccess();
     return result;
   } catch (err) {
-    breakers.deepseek.recordFailure();
+    breaker.recordFailure();
     throw err;
   }
 }
@@ -374,11 +377,35 @@ export async function chatJSON<T>(opts: {
   tool?: { name: string; description: string; parameters: Record<string, unknown> };
   model?: string;
 }): Promise<T> {
-  // Camino 1: DeepSeek para análisis de texto y estructura
+  // Camino 1: Groq (Gratis y ultra rápido, modelo Llama 3)
+  const groqKey = getGroqKey();
+  if (groqKey) {
+    try {
+      return await chatJSONViaOpenAICompatible<T>({
+        ...opts,
+        apiKey: groqKey,
+        apiUrl: "https://api.groq.com/openai/v1/chat/completions",
+        model: "llama-3.3-70b-versatile",
+        provider: "groq",
+      });
+    } catch (err) {
+      const e = err as { message?: string };
+      logAi({ endpoint: "groq", status: "error", error: e?.message?.slice(0, 200) });
+      throw new Error(`Error de Groq: ${e?.message || "Desconocido"}`);
+    }
+  }
+
+  // Camino 2: DeepSeek
   const deepseekKey = getDeepSeekKey();
   if (deepseekKey) {
     try {
-      return await chatJSONViaDeepSeek<T>({ ...opts, apiKey: deepseekKey });
+      return await chatJSONViaOpenAICompatible<T>({
+        ...opts,
+        apiKey: deepseekKey,
+        apiUrl: DEEPSEEK_API_URL,
+        model: "deepseek-chat",
+        provider: "deepseek",
+      });
     } catch (err) {
       const e = err as { message?: string };
       logAi({
@@ -386,12 +413,11 @@ export async function chatJSON<T>(opts: {
         status: "error",
         error: e?.message?.slice(0, 200),
       });
-      // Si DeepSeek falla, arrojamos el error exacto en lugar de caer a Gemini silenciosamente.
       throw new Error(`Error de DeepSeek: ${e?.message || "Desconocido"}`);
     }
   }
 
-  // Camino 2: Gemini como fallback (o primario si no hay DeepSeek)
+  // Camino 3: Gemini como fallback final (o primario si no hay Groq/DeepSeek)
   return chatJSONViaGemini<T>(opts);
 }
 

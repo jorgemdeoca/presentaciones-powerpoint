@@ -38,6 +38,7 @@ export const buckets = {
   pro: new TokenBucket(2, 2 / 60),
   image: new TokenBucket(5, 5 / 60),
   deepseek: new TokenBucket(20, 20 / 60),
+  groq: new TokenBucket(30, 30 / 60),
 } as const;
 
 export type BucketKey = keyof typeof buckets;
