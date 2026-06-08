@@ -377,6 +377,8 @@ export async function chatJSON<T>(opts: {
   tool?: { name: string; description: string; parameters: Record<string, unknown> };
   model?: string;
 }): Promise<T> {
+  const errors: string[] = [];
+
   // Camino 1: Groq (Gratis y ultra rápido, modelo Llama 3)
   const groqKey = getGroqKey();
   if (groqKey) {
@@ -390,8 +392,8 @@ export async function chatJSON<T>(opts: {
       });
     } catch (err) {
       const e = err as { message?: string };
-      logAi({ endpoint: "groq", status: "error", error: e?.message?.slice(0, 200) });
-      throw new Error(`Error de Groq: ${e?.message || "Desconocido"}`);
+      logAi({ endpoint: "groq", status: "fallback", error: e?.message?.slice(0, 200) });
+      errors.push(`Groq: ${e?.message || "Desconocido"}`);
     }
   }
 
@@ -408,17 +410,19 @@ export async function chatJSON<T>(opts: {
       });
     } catch (err) {
       const e = err as { message?: string };
-      logAi({
-        endpoint: "deepseek",
-        status: "error",
-        error: e?.message?.slice(0, 200),
-      });
-      throw new Error(`Error de DeepSeek: ${e?.message || "Desconocido"}`);
+      logAi({ endpoint: "deepseek", status: "fallback", error: e?.message?.slice(0, 200) });
+      errors.push(`DeepSeek: ${e?.message || "Desconocido"}`);
     }
   }
 
   // Camino 3: Gemini como fallback final (o primario si no hay Groq/DeepSeek)
-  return chatJSONViaGemini<T>(opts);
+  try {
+    return await chatJSONViaGemini<T>(opts);
+  } catch (err) {
+    const e = err as { message?: string };
+    errors.push(`Gemini: ${e?.message || "Desconocido"}`);
+    throw new Error(`Todas las IAs fallaron en cascada:\n${errors.join("\n")}`);
+  }
 }
 
 // ------------------------------------------------------------------

@@ -42,7 +42,7 @@ const slideSchema = {
       required: ["type", "value"],
     },
   },
-  required: ["title", "layout", "image_prompt", "bullets"],
+  required: ["title", "layout", "image_prompt"],
 };
 
 export async function runPlannerWriter(opts: {
