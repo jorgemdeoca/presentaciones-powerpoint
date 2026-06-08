@@ -47,7 +47,7 @@ async function chatJSONViaDeepSeek<T>(opts: {
       { role: "user", content: opts.user },
     ],
     temperature: 0.7,
-    max_tokens: 16384,
+    max_tokens: 8192,
   };
 
   if (opts.tool) {
@@ -383,10 +383,11 @@ export async function chatJSON<T>(opts: {
       const e = err as { message?: string };
       logAi({
         endpoint: "deepseek",
-        status: "fallback-to-gemini",
+        status: "error",
         error: e?.message?.slice(0, 200),
       });
-      // Caer a Gemini como respaldo
+      // Si DeepSeek falla, arrojamos el error exacto en lugar de caer a Gemini silenciosamente.
+      throw new Error(`Error de DeepSeek: ${e?.message || "Desconocido"}`);
     }
   }
 
