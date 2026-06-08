@@ -9,8 +9,6 @@ export default defineConfig(() => ({
     tanstackStart({
       server: {
         entry: "src/server.ts",
-        // Detecta explícitamente si se está desplegando en Vercel
-        preset: process.env.VERCEL ? "vercel" : "node",
       },
     }),
     react(),
