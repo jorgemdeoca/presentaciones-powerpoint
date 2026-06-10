@@ -24,6 +24,10 @@ function getGroqKey(): string | undefined {
   return process.env.GROQ_API_KEY?.trim() || undefined;
 }
 
+function getDeepSeekKey(): string | undefined {
+  return process.env.DEEPSEEK_API_KEY?.trim() || undefined;
+}
+
 /**
  * Llama a APIs compatibles con OpenAI (DeepSeek, Groq) para generar JSON estructurado.
  */
@@ -524,7 +528,7 @@ async function generateImageViaPollinations(prompt: string): Promise<string> {
   }
   const seed = Math.floor(Math.random() * 1_000_000);
   const cleanPrompt = encodeURIComponent(prompt.trim().slice(0, 800));
-  const url = `https://image.pollinations.ai/prompt/${cleanPrompt}?width=1280&height=720&nologo=true&seed=${seed}`;
+  const url = `https://image.pollinations.ai/prompt/${cleanPrompt}?width=1280&height=720&seed=${seed}`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 45_000);
   const t0 = Date.now();
@@ -606,16 +610,10 @@ export async function getSlideImageCascade(opts: {
     }
   }
 
-  if (opts.allowWeb) {
-    const emergencyQuery = (opts.query || opts.prompt)
-      .replace(/[^\p{L}\p{N}\s-]/gu, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, 120);
-    const emergencyUrl = emergencyQuery
-      ? `https://source.unsplash.com/1600x900/?${encodeURIComponent(emergencyQuery)}`
-      : "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1600&q=80";
-    logAi({ endpoint: "cascade:emergency-web", status: "fallback", meta: { query: emergencyQuery } });
+  if (opts.allowWeb || opts.allowAi) {
+    // Si llegamos hasta aquí y todo falló, retornamos una imagen de emergencia para que la diapositiva no se rompa
+    const emergencyUrl = "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1600&q=80";
+    logAi({ endpoint: "cascade:emergency", status: "fallback" });
     return { kind: "url", url: emergencyUrl };
   }
 
