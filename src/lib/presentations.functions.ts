@@ -195,57 +195,50 @@ async function advanceGenerationStep(
     if (data.withImages && (data.imageSources.ai || data.imageSources.web)) {
       const slides = insertedSlides ?? [];
       const total = slides.length;
-      const chunkSize = 3; // Generamos 3 imágenes en paralelo a la vez para no exceder los 60s de Vercel
-      let completedImages = 0;
-
-      for (let i = 0; i < total; i += chunkSize) {
-        const chunk = slides.slice(i, i + chunkSize);
-        
-        await Promise.all(
-          chunk.map(async (slide, chunkIdx) => {
-            const idx = i + chunkIdx;
-            const spec = enriched.slides[idx];
-            if (!slide || !spec) return;
-            
-            const declared = (spec as { image_source?: "ai" | "web" | "none" }).image_source ??
-              (data.imageSources.ai ? "ai" : data.imageSources.web ? "web" : "none");
-              
-            if (declared !== "none") {
-              const prefer: "ai" | "web" = declared === "web" ? "web" : "ai";
-              try {
-                const result = await getSlideImageCascade({
-                  prompt: spec.image_prompt ?? spec.title ?? "abstract premium background",
-                  query: (spec as { image_query?: string }).image_query || spec.title || spec.image_prompt,
-                  prefer,
-                  allowAi: data.imageSources.ai,
-                  allowWeb: data.imageSources.web,
-                });
-                if (result?.kind === "url") {
-                  await supabase.from("slides").update({ image_url: result.url }).eq("id", slide.id);
-                  if (slide.position === 0) {
-                    await supabase.from("presentations").update({ thumbnail_url: result.url }).eq("id", presentationId);
-                  }
-                } else if (result?.kind === "b64") {
-                  const buffer = Buffer.from(result.data, "base64");
-                  const path = slideImagePath(userId, presentationId, slide.id);
-                  const up = await supabase.storage.from("slide-images").upload(path, buffer, { contentType: "image/png", upsert: true });
-                  if (!up.error) {
-                    const { data: pub } = supabase.storage.from("slide-images").getPublicUrl(path);
-                    await supabase.from("slides").update({ image_url: pub.publicUrl }).eq("id", slide.id);
-                    if (slide.position === 0) {
-                      await supabase.from("presentations").update({ thumbnail_url: pub.publicUrl }).eq("id", presentationId);
-                    }
-                  }
+      for (let idx = 0; idx < total; idx++) {
+        const slide = slides[idx];
+        const spec = enriched.slides[idx];
+        if (!slide || !spec) continue;
+        const declared =
+          (spec as { image_source?: "ai" | "web" | "none" }).image_source ??
+          (data.imageSources.ai ? "ai" : data.imageSources.web ? "web" : "none");
+        if (declared !== "none") {
+          const prefer: "ai" | "web" = declared === "web" ? "web" : "ai";
+          try {
+            const result = await getSlideImageCascade({
+              prompt: spec.image_prompt ?? spec.title ?? "abstract premium background",
+              query: (spec as { image_query?: string }).image_query || spec.title || spec.image_prompt,
+              prefer,
+              allowAi: data.imageSources.ai,
+              allowWeb: data.imageSources.web,
+            });
+            if (result?.kind === "url") {
+              await supabase.from("slides").update({ image_url: result.url }).eq("id", slide.id);
+              if (slide.position === 0) {
+                await supabase.from("presentations").update({ thumbnail_url: result.url }).eq("id", presentationId);
+              }
+            } else if (result?.kind === "b64") {
+              const buffer = Buffer.from(result.data, "base64");
+              const path = slideImagePath(userId, presentationId, slide.id);
+              const up = await supabase.storage.from("slide-images").upload(path, buffer, { contentType: "image/png", upsert: true });
+              if (!up.error) {
+                const { data: pub } = supabase.storage.from("slide-images").getPublicUrl(path);
+                await supabase.from("slides").update({ image_url: pub.publicUrl }).eq("id", slide.id);
+                if (slide.position === 0) {
+                  await supabase.from("presentations").update({ thumbnail_url: pub.publicUrl }).eq("id", presentationId);
                 }
-              } catch (e) {
-                const err = e as { message?: string };
-                logAi({ traceId, presentationId, slideIdx: idx, endpoint: "image:slide", status: "error", error: err?.message?.slice(0, 160) });
               }
             }
-          })
-        );
-        completedImages += chunk.length;
-        await setPresentationStep(supabase, userId, presentationId, `images:${Math.min(completedImages, total)}/${total}`);
+          } catch (e) {
+            const err = e as { message?: string };
+            logAi({ traceId, presentationId, slideIdx: idx, endpoint: "image:slide", status: "error", error: err?.message?.slice(0, 160) });
+          }
+        }
+        await setPresentationStep(supabase, userId, presentationId, `images:${idx + 1}/${total}`);
+        // Delay entre imágenes para evitar rate limiting de Gemini
+        if (idx < total - 1) {
+          await new Promise((r) => setTimeout(r, 2000));
+        }
       }
     }
 

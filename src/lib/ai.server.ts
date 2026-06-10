@@ -403,7 +403,7 @@ export async function chatJSON<T>(opts: {
             ...opts,
             apiKey: groqKey,
             apiUrl: "https://api.groq.com/openai/v1/chat/completions",
-            model: "llama3-8b-8192", // Modelo más ligero, mayor límite de tokens
+            model: "llama-3.1-8b-instant", // Modelo moderno, mayor límite de tokens
             provider: "groq",
           });
         } catch (err2) {
