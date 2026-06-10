@@ -48,7 +48,7 @@ function NewPresentation() {
   ]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
-  const [selectedRefs, setSelectedRefs] = useState<string[]>(refs.map((r) => r.id));
+  const [selectedRefs, setSelectedRefs] = useState<string[]>([]);
 
   // generation settings
   const [slideCount, setSlideCount] = useState(settings.default_slide_count);

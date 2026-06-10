@@ -477,8 +477,17 @@ export async function generateImageBase64(prompt: string): Promise<string> {
     const e = err as { message?: string };
     logAi({ endpoint: "pollinations", status: "fallback-to-unsplash", error: e?.message?.slice(0, 200) });
     
-    // Fallback 2: Unsplash (imagen fija de alta calidad convertida a base64)
-    const fallbackUrl = "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1600&q=80";
+    // Fallback 2: Unsplash (imágenes aleatorias de alta calidad)
+    const fallbacks = [
+      "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1600&q=80",
+      "https://images.unsplash.com/photo-1497215728101-856f4ea42174?auto=format&fit=crop&w=1600&q=80",
+      "https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=1600&q=80",
+      "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?auto=format&fit=crop&w=1600&q=80",
+      "https://images.unsplash.com/photo-1557682250-33bd709cbe85?auto=format&fit=crop&w=1600&q=80",
+      "https://images.unsplash.com/photo-1557682224-5b8590cd9ec5?auto=format&fit=crop&w=1600&q=80",
+      "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1600&q=80"
+    ];
+    const fallbackUrl = fallbacks[Math.floor(Math.random() * fallbacks.length)];
     const res = await fetch(fallbackUrl);
     const arrayBuffer = await res.arrayBuffer();
     return Buffer.from(arrayBuffer).toString("base64");
