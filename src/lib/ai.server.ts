@@ -475,65 +475,53 @@ export async function generateImageBase64(prompt: string): Promise<string> {
 }
 
 /**
- * Genera imagen vía Gemini Image Generation API.
- * Intenta múltiples modelos en cascada.
+ * Genera imagen vía Gemini API usando Imagen 3 (modelo oficial para imágenes).
  */
 async function generateImageViaGemini(prompt: string, apiKey: string): Promise<string> {
-  const models = [
-    "gemini-2.0-flash-preview-image-generation",
-    "gemini-2.0-flash-exp",
-  ];
+  const model = "imagen-3.0-generate-002";
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 60_000);
   
-  let lastError = "";
-  for (const model of models) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60_000);
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt.slice(0, 2000) }] }],
-          generationConfig: {
-            responseModalities: ["TEXT", "IMAGE"],
-          },
-        }),
-        signal: controller.signal,
-      });
-
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        lastError = `Gemini Image ${model} ${res.status}: ${text.slice(0, 200)}`;
-        if (res.status === 404) {
-          // Modelo no disponible, probar siguiente
-          continue;
-        }
-        throw new Error(lastError);
-      }
-
-      const json = await res.json();
-      const parts = json?.candidates?.[0]?.content?.parts;
-      if (parts) {
-        for (const part of parts) {
-          if (part.inlineData?.data) {
-            return part.inlineData.data;
+  try {
+    // Usamos el endpoint predict específico para Imagen 3
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict?key=${apiKey}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        instances: [
+          {
+            prompt: prompt.slice(0, 1000) // Imagen 3 prompt limit
           }
+        ],
+        parameters: {
+          sampleCount: 1,
+          aspectRatio: "16:9" // Formato ideal para presentaciones
         }
-      }
-      lastError = `${model} no devolvió imagen en la respuesta`;
-      continue;
-    } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") {
-        lastError = `Timeout generando imagen con ${model}`;
-        continue;
-      }
-      throw err;
-    } finally {
-      clearTimeout(timeout);
+      }),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`Gemini Imagen3 ${res.status}: ${text.slice(0, 200)}`);
     }
+
+    const json = await res.json();
+    const b64 = json?.predictions?.[0]?.bytesBase64Encoded;
+    if (b64) {
+      return b64;
+    }
+    
+    throw new Error("Imagen 3 no devolvió bytesBase64Encoded en la respuesta");
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error(`Timeout generando imagen con ${model}`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
   }
-  throw new Error(lastError || "Ningún modelo de Gemini pudo generar la imagen");
 }
 
 async function generateImageViaPollinations(prompt: string): Promise<string> {
