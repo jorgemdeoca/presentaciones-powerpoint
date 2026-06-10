@@ -396,6 +396,21 @@ export async function chatJSON<T>(opts: {
       });
     } catch (err) {
       const e = err as { message?: string };
+      // Si fue error de rate limit, intentamos con el modelo más pequeño que tiene límites más altos
+      if (e?.message?.includes("Rate limit")) {
+        try {
+          return await chatJSONViaOpenAICompatible<T>({
+            ...opts,
+            apiKey: groqKey,
+            apiUrl: "https://api.groq.com/openai/v1/chat/completions",
+            model: "llama3-8b-8192", // Modelo más ligero, mayor límite de tokens
+            provider: "groq",
+          });
+        } catch (err2) {
+          const e2 = err2 as { message?: string };
+          errors.push(`Groq (8b fallback): ${e2?.message || "Desconocido"}`);
+        }
+      }
       logAi({ endpoint: "groq", status: "fallback", error: e?.message?.slice(0, 200) });
       errors.push(`Groq: ${e?.message || "Desconocido"}`);
     }
