@@ -1,11 +1,12 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { Home, Plus, Settings, Sparkles, LogOut } from "lucide-react";
+import { Home, Plus, Settings, Sparkles, LogOut, Activity } from "lucide-react";
 import { useAuth, signOut } from "@/components/AuthProvider";
 import { toast } from "sonner";
 
 const items = [
   { to: "/", label: "Biblioteca", icon: Home },
   { to: "/new", label: "Crear", icon: Plus },
+  { to: "/tokens", label: "Uso de Tokens", icon: Activity },
   { to: "/settings", label: "Ajustes", icon: Settings },
 ];
 

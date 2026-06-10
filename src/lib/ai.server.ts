@@ -28,6 +28,22 @@ function getDeepSeekKey(): string | undefined {
   return process.env.DEEPSEEK_API_KEY?.trim() || undefined;
 }
 
+// ------------------------------------------------------------------
+// Helper para trackear consumo de tokens en la BD
+// ------------------------------------------------------------------
+async function trackTokenUsage(provider: string, tokensUsed: number, limitTokens: number) {
+  try {
+    await supabaseAdmin.rpc("increment_api_usage", {
+      p_provider: provider,
+      p_tokens_used: tokensUsed,
+      p_requests_used: 1,
+      p_limit_tokens: limitTokens,
+    });
+  } catch (err) {
+    console.error("[TokenTracker] Error:", err);
+  }
+}
+
 /**
  * Llama a APIs compatibles con OpenAI (DeepSeek, Groq) para generar JSON estructurado.
  */
@@ -340,6 +356,13 @@ async function chatJSONViaGemini<T>(opts: {
   }
 
   const data = await response.json();
+  
+  // Tracking de tokens
+  const tokensUsed = data.usageMetadata?.totalTokenCount || 0;
+  if (tokensUsed > 0) {
+    trackTokenUsage("gemini", tokensUsed, 1000000); // 1M aprox limit for free tier
+  }
+
   const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!textResponse) {
     breakers.geminiDirect.recordFailure();

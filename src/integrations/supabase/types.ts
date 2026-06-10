@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_usage: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          limit_tokens: number
+          provider: string
+          requests_used: number
+          tokens_used: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          id?: string
+          limit_tokens?: number
+          provider: string
+          requests_used?: number
+          tokens_used?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          limit_tokens?: number
+          provider?: string
+          requests_used?: number
+          tokens_used?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       presentations: {
         Row: {
           created_at: string
