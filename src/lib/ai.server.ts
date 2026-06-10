@@ -470,8 +470,19 @@ export async function generateImageBase64(prompt: string): Promise<string> {
     }
   }
 
-  // Fallback: Pollinations (gratuito, sin API key)
-  return await generateImageViaPollinations(prompt);
+  // Fallback 1: Pollinations (gratuito, sin API key)
+  try {
+    return await generateImageViaPollinations(prompt);
+  } catch (err) {
+    const e = err as { message?: string };
+    logAi({ endpoint: "pollinations", status: "fallback-to-unsplash", error: e?.message?.slice(0, 200) });
+    
+    // Fallback 2: Unsplash (imagen fija de alta calidad convertida a base64)
+    const fallbackUrl = "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1600&q=80";
+    const res = await fetch(fallbackUrl);
+    const arrayBuffer = await res.arrayBuffer();
+    return Buffer.from(arrayBuffer).toString("base64");
+  }
 }
 
 /**
