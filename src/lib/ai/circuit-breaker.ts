@@ -64,7 +64,7 @@ export const breakers = {
   deepseek: new CircuitBreaker("deepseek", { failureThreshold: 4, cooldownMs: 45_000 }),
   groq: new CircuitBreaker("groq", { failureThreshold: 4, cooldownMs: 45_000 }),
   geminiDirect: new CircuitBreaker("gemini:direct", { failureThreshold: 4, cooldownMs: 60_000 }),
-  geminiImage: new CircuitBreaker("gemini:image", { failureThreshold: 3, cooldownMs: 45_000 }),
-  pollinations: new CircuitBreaker("pollinations", { failureThreshold: 3, cooldownMs: 30_000 }),
+  geminiImage: new CircuitBreaker("gemini:image", { failureThreshold: 8, cooldownMs: 30_000 }),
+  pollinations: new CircuitBreaker("pollinations", { failureThreshold: 8, cooldownMs: 20_000 }),
   unsplash: new CircuitBreaker("unsplash", { failureThreshold: 3, cooldownMs: 30_000 }),
 };

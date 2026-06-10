@@ -457,43 +457,64 @@ export async function generateImageBase64(prompt: string): Promise<string> {
 
 /**
  * Genera imagen vía Gemini Image Generation API.
- * Usa el modelo gemini-2.0-flash-exp con modalidad image.
+ * Intenta múltiples modelos en cascada.
  */
 async function generateImageViaGemini(prompt: string, apiKey: string): Promise<string> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60_000);
-  try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt.slice(0, 2000) }] }],
-        generationConfig: {
-          responseModalities: ["TEXT", "IMAGE"],
-        },
-      }),
-      signal: controller.signal,
-    });
+  const models = [
+    "gemini-2.0-flash-preview-image-generation",
+    "gemini-2.0-flash-exp",
+  ];
+  
+  let lastError = "";
+  for (const model of models) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60_000);
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt.slice(0, 2000) }] }],
+          generationConfig: {
+            responseModalities: ["TEXT", "IMAGE"],
+          },
+        }),
+        signal: controller.signal,
+      });
 
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new Error(`Gemini Image ${res.status}: ${text.slice(0, 200)}`);
-    }
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        lastError = `Gemini Image ${model} ${res.status}: ${text.slice(0, 200)}`;
+        if (res.status === 404) {
+          // Modelo no disponible, probar siguiente
+          continue;
+        }
+        throw new Error(lastError);
+      }
 
-    const json = await res.json();
-    const parts = json?.candidates?.[0]?.content?.parts;
-    if (parts) {
-      for (const part of parts) {
-        if (part.inlineData?.data) {
-          return part.inlineData.data;
+      const json = await res.json();
+      const parts = json?.candidates?.[0]?.content?.parts;
+      if (parts) {
+        for (const part of parts) {
+          if (part.inlineData?.data) {
+            return part.inlineData.data;
+          }
         }
       }
+      lastError = `${model} no devolvió imagen en la respuesta`;
+      continue;
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        lastError = `Timeout generando imagen con ${model}`;
+        continue;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeout);
     }
-    throw new Error("Gemini no devolvió imagen en la respuesta");
-  } finally {
-    clearTimeout(timeout);
   }
+  throw new Error(lastError || "Ningún modelo de Gemini pudo generar la imagen");
 }
 
 async function generateImageViaPollinations(prompt: string): Promise<string> {

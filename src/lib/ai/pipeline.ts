@@ -141,7 +141,26 @@ export async function runArtDirector(deck: DeckSpec, opts: { visualStyle: string
     },
   });
 
-  return { ...deck, slides: enriched.slides };
+  // Merge: preservar bullets/subtitle/notes del planner si el art director los omite
+  const merged = deck.slides.map((original, i) => {
+    const art = enriched.slides[i];
+    if (!art) return original;
+    return {
+      ...original,
+      title: art.title || original.title,
+      subtitle: art.subtitle || original.subtitle,
+      bullets: (art.bullets && art.bullets.length > 0) ? art.bullets : (original.bullets ?? []),
+      notes: art.notes || original.notes,
+      layout: art.layout || original.layout,
+      image_prompt: art.image_prompt || original.image_prompt,
+      image_source: (art as { image_source?: string }).image_source || (original as { image_source?: string }).image_source,
+      image_query: (art as { image_query?: string }).image_query || (original as { image_query?: string }).image_query,
+      design: art.design ?? original.design,
+      background: art.background ?? original.background,
+    };
+  });
+
+  return { ...deck, slides: merged };
 }
 
 export function enrichImagePrompts(

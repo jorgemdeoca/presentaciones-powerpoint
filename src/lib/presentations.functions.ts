@@ -235,6 +235,10 @@ async function advanceGenerationStep(
           }
         }
         await setPresentationStep(supabase, userId, presentationId, `images:${idx + 1}/${total}`);
+        // Delay entre imágenes para evitar rate limiting de Gemini
+        if (idx < total - 1) {
+          await new Promise((r) => setTimeout(r, 2000));
+        }
       }
     }
 
