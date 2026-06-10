@@ -182,6 +182,7 @@ export function enrichImagePrompts(
         visualStyle: opts.visualStyle,
         cinematicLevel: opts.cinematicLevel,
         topic: opts.topic,
+        layout: s.layout,
       }),
     };
   });

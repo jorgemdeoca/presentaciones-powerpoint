@@ -6,6 +6,7 @@ export function buildImagePrompt(opts: {
   visualStyle: string;
   cinematicLevel?: string;
   topic: string;
+  layout?: string;
 }): string {
   const palette = getPaletteMeta(opts.paletteId);
   const style = getVisualStyleMeta(opts.visualStyle as VisualStyleId);
@@ -19,12 +20,25 @@ export function buildImagePrompt(opts: {
           ? "Iluminación profesional suave, composición editorial."
           : "Iluminación natural limpia.";
 
-  return `TEMA OBLIGATORIO (la imagen DEBE representar literalmente este tema): ${opts.topic}.
+  let composition = "Fondo panorámico expansivo, composición inmersiva dejando espacio limpio para texto.";
+  if (opts.layout?.includes("split")) {
+    composition = "Composición balanceada para mitad de pantalla. Sujeto principal bien enmarcado, fondo limpio y no distractor.";
+  } else if (opts.layout === "floating_image" || opts.layout === "asymmetric") {
+    composition = "Objeto principal aislado, render 3D creativo, objetos con relieve o fotografía de producto macro sobre fondo ultra limpio. Ideal para flotar asimétricamente sobre la diapositiva sin bordes duros.";
+  } else if (opts.layout?.includes("metric") || opts.layout?.includes("bento") || opts.layout?.includes("dashboard") || opts.layout?.includes("infographic")) {
+    composition = "Diseño isométrico 3D, elementos UI abstractos, texturas con relieve sutil, o iconos minimalistas hiperrealistas sobre fondo sólido.";
+  } else if (opts.layout === "collage_editorial") {
+    composition = "Composición creativa tipo collage, superposición de imágenes, texturas ricas, estilo moderno y muy artístico.";
+  } else if (opts.layout === "image_cards") {
+    composition = "Fotografía editorial de altísima calidad, enfoque centrado en el sujeto principal.";
+  }
+
+  return `TEMA OBLIGATORIO: ${opts.topic}.
 Descripción específica del slide: ${opts.basePrompt}.
 Estilo visual: ${style.label} — ${style.description}.
+Composición y Forma requerida: ${composition}.
 ${cinematic} Color grading acorde a paleta "${palette.name}": ${colors}.
-Composición editorial premium, regla de tercios. Alta resolución 16:9.
-REGLA CRÍTICA DE TEXTO: Preferiblemente SIN texto en la imagen. Si por la naturaleza de la escena aparece algún texto (letrero, pizarra, libro, pantalla, cartel), DEBE estar escrito en ESPAÑOL correcto, sin faltas, sin caracteres inventados ni letras deformadas.
+REGLA CRÍTICA DE TEXTO: Preferiblemente SIN texto. Si aparece texto (letreros, pantallas), DEBE estar en ESPAÑOL correcto, sin letras deformadas ni caracteres inventados.
 No incluyas marcas de agua ni logos.`;
 }
 
